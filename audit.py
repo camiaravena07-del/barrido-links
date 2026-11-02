@@ -211,6 +211,7 @@ class Crawler:
         self.depth: dict[str, int] = {}
         self.sources: dict[str, list[dict]] = defaultdict(list)
         self.source_pages: dict[str, set[str]] = defaultdict(set)
+        self.start_failure: str | None = None
 
     def is_internal(self, url: str) -> bool:
         return urlsplit(url).netloc.lower() in self.hosts
@@ -245,6 +246,9 @@ class Crawler:
         resp.close()
 
         soup = BeautifulSoup(html, "lxml") if html else None
+        rec["content_type"] = ctype.split(";")[0]
+        rec["size"] = len(html)
+        rec["title"] = soup.title.get_text(" ", strip=True)[:120] if soup is not None and soup.title else ""
         body_classes = set((soup.body.get("class") or []) if soup is not None and soup.body else [])
 
         if body_classes & NOROUTE_CLASSES or resp.status_code in (404, 410):
@@ -372,10 +376,34 @@ class Crawler:
                     if link not in self.depth:
                         self.depth[link] = level + 1
                         next_frontier.append(link)
+            if level == 0 and not next_frontier:
+                rec = results[0][1] if results else {}
+                if rec.get("error"):
+                    self.start_failure = f"El home no respondió ({rec['error']}). El sitio puede estar caído o bloqueando las conexiones desde GitHub."
+                else:
+                    self.start_failure = (
+                        f"El home respondió sin links (status {rec.get('status')}, "
+                        f"tipo {rec.get('content_type') or '?'}, {rec.get('size', 0)} caracteres, "
+                        f"título \"{rec.get('title') or 'sin título'}\", URL final {rec.get('final_url')}). "
+                        "Probablemente el sitio está bloqueando el barrido con una página de verificación anti-bot."
+                    )
+                self.save_start_page(start)
+                break
             frontier = next_frontier
             level += 1
 
         return {"duration_s": round(time.time() - started, 1), "truncated": truncated}
+
+    def save_start_page(self, url: str) -> None:
+        """Guarda lo que devolvió el home, para ver qué está respondiendo el sitio."""
+        try:
+            resp = self.session.get(url, timeout=self.timeout)
+            path = REPORTS_DIR / self.site["id"] / "home_recibido.html"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(resp.text, encoding="utf-8")
+            print(f"  Guardé lo que respondió el home en {path.relative_to(ROOT)}")
+        except requests.RequestException:
+            pass
 
     def add_source(self, link: str, page: str, zone: str, text: str) -> None:
         self.source_pages[link].add(page)
@@ -590,6 +618,7 @@ def render_dashboard(site_order: list[str]) -> None:
                "reports": reports}
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     html = TEMPLATE.read_text(encoding="utf-8").replace('"__AUDIT_DATA__"', blob)
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
     (DOCS_DIR / "index.html").write_text(html, encoding="utf-8")
 
 
@@ -638,11 +667,22 @@ def main() -> int:
         return 2
 
     total_critical = 0
+    failures: list[str] = []
     for site in selected:
         cfg = {**defaults, **site.get("overrides", {})}
         print(f"\n▶ {site['name']} ({site['url']})", flush=True)
         crawler = Crawler(site, cfg)
         meta = crawler.run()
+        if crawler.start_failure:
+            failures.append(site["name"])
+            print(f"  ✖ {crawler.start_failure}")
+            print("    No actualicé el reporte de este sitio para no borrar el último resultado bueno.")
+            if os.environ.get("GITHUB_STEP_SUMMARY"):
+                with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+                    fh.write(f"## {site['name']}\n:x: **No se pudo revisar.** {crawler.start_failure}\n\n"
+                             f"Lo que respondió el sitio quedó en `reports/{site['id']}/home_recibido.html`. "
+                             "El dashboard mantiene el último resultado bueno.\n\n")
+            continue
         report = save_site_report(site, crawler, meta)
         write_step_summary(report)
         s = report["stats"]
@@ -653,6 +693,9 @@ def main() -> int:
 
     render_dashboard([s["id"] for s in sites])
     print(f"\nReporte: docs/index.html y reports/<sitio>/problemas.csv")
+    if failures:
+        print(f"\nNo se pudieron revisar: {', '.join(failures)}")
+        return 1
     return 1 if (args.fail_on_critical and total_critical) else 0
 
 
