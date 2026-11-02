@@ -118,17 +118,71 @@ def canon(url: str) -> tuple[str, str, str]:
 
 
 def zone_of(a) -> str:
+    """Zona del sitio donde está el link. Un <nav> dentro del contenido (ej. índice de una página CMS) cuenta como Contenido."""
+    in_nav = False
     for parent in a.parents:
         if parent.name is None:
             continue
         classes = set(parent.get("class") or [])
-        if parent.name == "nav" or classes & MENU_CLASSES:
+        if classes & MENU_CLASSES:
             return "Menú"
         if parent.name == "footer" or classes & FOOTER_CLASSES:
             return "Footer"
         if parent.name == "header" or classes & HEADER_CLASSES:
-            return "Header"
+            return "Menú" if in_nav else "Header"
+        if parent.name == "nav":
+            in_nav = True
     return "Contenido"
+
+
+HIDDEN_CLASSES = {"no-display", "hidden", "d-none", "hide", "pagebuilder-hidden"}
+INLINE_HIDDEN = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
+
+
+def _strip_media_blocks(css: str) -> str:
+    """Quita los bloques @media (reglas solo para algunos tamaños de pantalla)."""
+    out, i = [], 0
+    while True:
+        j = css.find("@media", i)
+        if j < 0:
+            out.append(css[i:])
+            return "".join(out)
+        out.append(css[i:j])
+        k = css.find("{", j)
+        if k < 0:
+            return "".join(out)
+        depth, m = 1, k + 1
+        while m < len(css) and depth:
+            depth += {"{": 1, "}": -1}.get(css[m], 0)
+            m += 1
+        i = m
+
+
+def hidden_pb_styles(soup: BeautifulSoup) -> set[str]:
+    """IDs de Page Builder (data-pb-style) que el sitio oculta con display:none en todas las pantallas."""
+    ids = set()
+    for style in soup.find_all("style"):
+        css = _strip_media_blocks(style.get_text() or "")
+        for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+            if INLINE_HIDDEN.search(body):
+                ids.update(re.findall(r"data-pb-style\s*=\s*[\"']?([\w-]+)", sel))
+    return ids
+
+
+def is_hidden(a, pb_hidden: set[str]) -> bool:
+    """True si el link está dentro de un bloque que el cliente no ve (desactivado u oculto)."""
+    for el in [a, *a.parents]:
+        if el.name is None or el.name in ("html", "body"):
+            continue
+        if el.has_attr("hidden"):
+            return True
+        if INLINE_HIDDEN.search(el.get("style") or ""):
+            return True
+        if set(el.get("class") or []) & HIDDEN_CLASSES:
+            return True
+        if pb_hidden and el.get("data-pb-style") in pb_hidden:
+            return True
+    return False
 
 
 def anchor_text(a) -> str:
@@ -315,8 +369,11 @@ class Crawler:
         for selector in self.cfg.get("exclude_selectors", []):
             for el in soup.select(selector):
                 el.decompose()
+        pb_hidden = hidden_pb_styles(soup)
         found = []
         for a in soup.find_all("a", href=True):
+            if self.cfg.get("skip_hidden", True) and is_hidden(a, pb_hidden):
+                continue  # bloque oculto: el cliente no puede clickearlo
             url = normalize(a["href"], page_url, self.cfg)
             if not url:
                 continue
