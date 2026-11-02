@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Barrido de links</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF2F1;
+    --surface: #FFFFFF;
+    --ink: #1B2B33;
+    --muted: #5A6B70;
+    --line: #C9D3D1;
+    --crit: #B3261E;
+    --crit-bg: #FBE9E7;
+    --warn: #8A5A00;
+    --warn-bg: #FDF1D6;
+    --ok: #2E6B4E;
+    --focus: #1F5FA8;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #172126;
+      --surface: #1F2C32;
+      --ink: #E4ECEA;
+      --muted: #9AABAF;
+      --line: #34454C;
+      --crit: #FF8A80;
+      --crit-bg: #3A2224;
+      --warn: #F2C46B;
+      --warn-bg: #362D1A;
+      --ok: #7FCBA4;
+      --focus: #8AB8F0;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+      --paper: #172126;
+      --surface: #1F2C32;
+      --ink: #E4ECEA;
+      --muted: #9AABAF;
+      --line: #34454C;
+      --crit: #FF8A80;
+      --crit-bg: #3A2224;
+      --warn: #F2C46B;
+      --warn-bg: #362D1A;
+      --ok: #7FCBA4;
+      --focus: #8AB8F0;
+      color-scheme: dark;
+    }
+  :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.5 "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .demo { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 10px 14px; margin: 0 0 28px; font-weight: 700; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+
+  .sites { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 36px; }
+  .sites button {
+    font: inherit; font-size: 15px; cursor: pointer;
+    background: transparent; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+  }
+  .sites button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .sites .n { font-weight: 700; margin-left: 6px; }
+  .sites button[aria-pressed="false"] .n.has { color: var(--crit); }
+
+  h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.1; margin: 0 0 12px; letter-spacing: -0.01em; max-width: 20ch; }
+  h1.clean { color: var(--ok); }
+  .meta { color: var(--muted); margin: 0 0 28px; max-width: 70ch; }
+  .meta a { color: var(--muted); }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+    padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    position: sticky; top: env(safe-area-inset-top, 0px); background: var(--paper); z-index: 5;
+  }
+  .sev { display: flex; gap: 8px; }
+  .sev label {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    border-radius: 6px; padding: 5px 10px; font-weight: 700; font-size: 15px;
+  }
+  .sev .c { background: var(--crit-bg); color: var(--crit); }
+  .sev .w { background: var(--warn-bg); color: var(--warn); }
+  .sev input { accent-color: currentColor; margin: 0; }
+  .search { flex: 1 1 220px; }
+  .search input {
+    width: 100%; font: inherit; font-size: 15px; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px;
+  }
+  .hide-done { display: inline-flex; gap: 6px; align-items: center; font-size: 15px; color: var(--muted); cursor: pointer; }
+
+  section.group { margin-top: 40px; }
+  .group h2 { font-size: 21px; margin: 0; display: flex; align-items: baseline; gap: 10px; }
+  .group h2 .count { font-size: 15px; color: var(--muted); font-weight: 400; }
+  .group h2::before {
+    content: ""; width: 10px; height: 10px; border-radius: 2px; flex: none; align-self: center;
+    background: var(--crit);
+  }
+  .group.aviso h2::before { background: var(--warn); }
+  .group .todo { color: var(--muted); margin: 4px 0 12px 20px; }
+
+  ul.rows { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  li.row { display: grid; grid-template-columns: 28px 1fr auto; gap: 4px 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
+  li.row:first-child { border-top: 0; }
+  li.row.done .path { text-decoration: line-through; color: var(--muted); }
+  li.row input[type=checkbox] { width: 18px; height: 18px; margin-top: 3px; cursor: pointer; }
+  .path { font-weight: 700; word-break: break-all; text-decoration: none; }
+  .path:hover { text-decoration: underline; }
+  .where { color: var(--muted); font-size: 15px; margin-top: 2px; }
+  .where q { color: var(--ink); }
+  .fact { font-size: 15px; text-align: right; white-space: nowrap; color: var(--muted); }
+  .fact strong { color: var(--ink); }
+  details { grid-column: 2 / -1; font-size: 14px; color: var(--muted); }
+  details summary { cursor: pointer; width: fit-content; }
+  details ul { margin: 6px 0 0; padding-left: 18px; }
+  details li { margin: 2px 0; word-break: break-all; }
+
+  .empty-state { margin-top: 40px; color: var(--muted); }
+  footer.note { margin-top: 56px; color: var(--muted); font-size: 14px; max-width: 70ch; }
+
+  @media (max-width: 640px) {
+    li.row { grid-template-columns: 24px 1fr; }
+    .fact { grid-column: 2; text-align: left; white-space: normal; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="sites" id="sites" aria-label="Sitios"></nav>
+  <h1 id="headline"></h1>
+  <p class="meta" id="meta"></p>
+
+  <div class="controls" role="group" aria-label="Filtros">
+    <div class="sev">
+      <label class="c"><input type="checkbox" id="f-crit" checked> <span id="l-crit">Críticos</span></label>
+      <label class="w"><input type="checkbox" id="f-warn" checked> <span id="l-warn">Avisos</span></label>
+    </div>
+    <div class="search"><input type="search" id="q" placeholder="Buscar por URL o texto del link" aria-label="Buscar por URL o texto del link"></div>
+    <label class="hide-done"><input type="checkbox" id="f-done"> Ocultar corregidos</label>
+  </div>
+
+  <main id="list"></main>
+
+  <footer class="note">
+    Marca cada link como corregido cuando lo arregles; la marca queda guardada en este navegador.
+    Para confirmar los arreglos, vuelve a correr el barrido desde GitHub Actions.
+  </footer>
+</div>
+
+<script>
+const DATA = {"issues": {"404": {"severity": "critico", "label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo."}, "sin_productos": {"severity": "critico", "label": "Listado sin productos", "todo": "Asigna productos a la categoría o landing, o quita el link."}, "redirige_home": {"severity": "critico", "label": "Redirige al home", "todo": "El destino ya no existe y Magento manda al home. Cambia el link."}, "error_servidor": {"severity": "critico", "label": "Error del servidor (5xx)", "todo": "La página falla al cargar. Revísala con el equipo técnico."}, "error_conexion": {"severity": "critico", "label": "No responde", "todo": "La página no respondió a tiempo. Ábrela a mano para confirmar."}, "pocos_productos": {"severity": "aviso", "label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link."}, "pdp_agotado": {"severity": "aviso", "label": "Producto agotado", "todo": "Un banner o link lleva a un producto sin stock. Cámbialo por uno disponible."}, "redirect": {"severity": "aviso", "label": "Redirige a otra URL", "todo": "Funciona, pero conviene apuntar el link directo a la URL final."}, "bloqueado": {"severity": "aviso", "label": "Acceso bloqueado (401/403)", "todo": "El sitio bloqueó la revisión o la página pide login. Ábrela a mano."}, "externo_roto": {"severity": "aviso", "label": "Link externo roto", "todo": "El sitio externo responde 404 o no existe. Cambia o quita el link."}}, "reports": [{"site": {"id": "tnf-pe", "name": "The North Face Perú", "url": "https://www.thenorthface.com.pe/"}, "generated_at": "2026-11-02T12:40:21+00:00", "stats": {"checked": 180, "internal": 160, "external": 20, "critical": 27, "warnings": 17, "by_issue": {"404": 21, "sin_productos": 6, "pocos_productos": 17}, "duration_s": 60.3, "truncated": false}, "issues": [{"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/nosotros/", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 1, "times_linked": 139, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Nosotros"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Nosotros"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Nosotros"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Nosotros"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Nosotros"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/especiales/ultimas-tallas", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 7, "where": "Contenido de /sale, Contenido de /sale/", "sources": [{"page": "https://www.thenorthface.com.pe/sale", "zone": "Contenido", "text": "[imagen] Banner_sale_desktop_1.jpg"}, {"page": "https://thenorthface.com.pe/sale/", "zone": "Contenido", "text": "[imagen] Banner_sale_desktop_1.jpg"}, {"page": "https://www.thenorthface.com.pe/sale?cat=317469", "zone": "Contenido", "text": "[imagen] Banner_sale_desktop_1.jpg"}, {"page": "https://www.thenorthface.com.pe/sale?cat=317544", "zone": "Contenido", "text": "[imagen] Banner_sale_desktop_1.jpg"}, {"page": "https://www.thenorthface.com.pe/sale?cat=317616", "zone": "Contenido", "text": "[imagen] Banner_sale_desktop_1.jpg"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/return-policy.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 5, "where": "Contenido de /mens-sizing/, Menú, Contenido de /mens-sizing", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Contenido", "text": "Más informaciones"}, {"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Devoluciones"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Contenido", "text": "Más informaciones"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Devoluciones"}, {"page": "https://www.thenorthface.com.pe/womens-sizing", "zone": "Contenido", "text": "Más informaciones"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/become-a-dealer.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Conviértete en un distribuidor"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Conviértete en un distribuidor"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Conviértete en un distribuidor"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/black-friday-cyber-monday.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Black Friday & Cyber Monday"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Black Friday & Cyber Monday"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Black Friday & Cyber Monday"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/contact-us.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Contactenos"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Contactenos"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Contactenos"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/cookie-policy.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Política de cookies"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Política de cookies"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Política de cookies"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/delivery.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Entrega"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Entrega"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Entrega"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/faq.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Preguntas frecuentes"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Preguntas frecuentes"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Preguntas frecuentes"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/payment-information.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Información de pago"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Información de pago"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Información de pago"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/privacy-policy-complete.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Política de privacidad"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Política de privacidad"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Política de privacidad"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/privacy.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Puntos destacados de la política de privacidad"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Puntos destacados de la política de privacidad"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Puntos destacados de la política de privacidad"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/product-care.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Mantenimiento del producto"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Mantenimiento del producto"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Mantenimiento del producto"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/sizing-charts.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Tabla de tallas"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Tabla de tallas"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Tabla de tallas"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/terms-and-conditions-promo.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Terms And Conditions Promo"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Terms And Conditions Promo"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Terms And Conditions Promo"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/terms-of-use.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Terms of Use"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Terms of Use"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Terms of Use"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/terms.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Condiciones de venta"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Condiciones de venta"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Condiciones de venta"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/help/warranty.html", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 3, "where": "Menú", "sources": [{"page": "https://thenorthface.com.pe/mens-sizing/", "zone": "Menú", "text": "Garantía"}, {"page": "https://www.thenorthface.com.pe/mens-sizing", "zone": "Menú", "text": "Garantía"}, {"page": "https://www.thenorthface.com.pe/unisex-sizing", "zone": "Menú", "text": "Garantía"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/especialestnf/fastpack", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 1, "times_linked": 2, "where": "Contenido de /", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Contenido", "text": "[imagen] nf-desktop_1.jpg"}, {"page": "http://www.thenorthface.com.pe/", "zone": "Contenido", "text": "[imagen] nf-desktop_1.jpg"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/tecnologia", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 1, "where": "Contenido de /cyber", "sources": [{"page": "https://www.thenorthface.com.pe/cyber", "zone": "Contenido", "text": "Tecnologías TNF"}]}, {"severity": "critico", "issue": "404", "issue_label": "Página no existe (404)", "todo": "Cambia el link a una URL vigente o quítalo.", "url": "https://www.thenorthface.com.pe/zapatos", "final_url": "", "status": 404, "error": null, "products": null, "page_type": "404", "depth": 2, "times_linked": 1, "where": "Contenido de /cyber", "sources": [{"page": "https://www.thenorthface.com.pe/cyber", "zone": "Contenido", "text": "Calzado"}]}, {"severity": "critico", "issue": "sin_productos", "issue_label": "Listado sin productos", "todo": "Asigna productos a la categoría o landing, o quita el link.", "url": "https://www.thenorthface.com.pe/calzado/mujer/casuales", "final_url": "", "status": 200, "error": null, "products": 0, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Casuales"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Casuales"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Casuales"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Casuales"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Casuales"}]}, {"severity": "critico", "issue": "sin_productos", "issue_label": "Listado sin productos", "todo": "Asigna productos a la categoría o landing, o quita el link.", "url": "https://www.thenorthface.com.pe/equipamiento/carpas", "final_url": "", "status": 200, "error": null, "products": 0, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Carpas"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Carpas"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Carpas"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Carpas"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Carpas"}]}, {"severity": "critico", "issue": "sin_productos", "issue_label": "Listado sin productos", "todo": "Asigna productos a la categoría o landing, o quita el link.", "url": "https://www.thenorthface.com.pe/equipamiento/carpas/3-estaciones-camping", "final_url": "", "status": 200, "error": null, "products": 0, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "3 Estaciones & Camping"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "3 Estaciones & Camping"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "3 Estaciones & Camping"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "3 Estaciones & Camping"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "3 Estaciones & Camping"}]}, {"severity": "critico", "issue": "sin_productos", "issue_label": "Listado sin productos", "todo": "Asigna productos a la categoría o landing, o quita el link.", "url": "https://www.thenorthface.com.pe/equipamiento/carpas/4-estaciones-expedicion", "final_url": "", "status": 200, "error": null, "products": 0, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "4 Estaciones & Expedición"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "4 Estaciones & Expedición"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "4 Estaciones & Expedición"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "4 Estaciones & Expedición"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "4 Estaciones & Expedición"}]}, {"severity": "critico", "issue": "sin_productos", "issue_label": "Listado sin productos", "todo": "Asigna productos a la categoría o landing, o quita el link.", "url": "https://www.thenorthface.com.pe/mujer/calzado/casuales", "final_url": "", "status": 200, "error": null, "products": 0, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Casuales"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Casuales"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Casuales"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Casuales"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Casuales"}]}, {"severity": "critico", "issue": "sin_productos", "issue_label": "Listado sin productos", "todo": "Asigna productos a la categoría o landing, o quita el link.", "url": "https://www.thenorthface.com.pe/mujer/casacas-y-chalecos/casacas-3-en-1", "final_url": "", "status": 200, "error": null, "products": 0, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Casacas 3 en 1"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Casacas 3 en 1"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Casacas 3 en 1"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Casacas 3 en 1"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Casacas 3 en 1"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/accesorios/cuellos", "final_url": "", "status": 200, "error": null, "products": 2, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Cuellos"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Cuellos"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Cuellos"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Cuellos"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Cuellos"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/calzado/mujer/pantuflas", "final_url": "", "status": 200, "error": null, "products": 2, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Pantuflas"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Pantuflas"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Pantuflas"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Pantuflas"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Pantuflas"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/calzado/ni-os", "final_url": "", "status": 200, "error": null, "products": 2, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Niños"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Niños"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Niños"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Niños"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Niños"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/equipamiento/equipaje-de-viaje/maletines", "final_url": "", "status": 200, "error": null, "products": 2, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Maletines"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Maletines"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Maletines"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Maletines"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Maletines"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/equipamiento/mochilas/canguros", "final_url": "", "status": 200, "error": null, "products": 1, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Canguros"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Canguros"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Canguros"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Canguros"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Canguros"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/equipamiento/sacos-de-dormir/plumas", "final_url": "", "status": 200, "error": null, "products": 1, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Plumas"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Plumas"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Plumas"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Plumas"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Plumas"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/equipamiento/sacos-de-dormir/sinteticos", "final_url": "", "status": 200, "error": null, "products": 3, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Sintéticos"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Sintéticos"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Sintéticos"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Sintéticos"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Sintéticos"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/hombre/casacas-y-chalecos/casacas-3-en-1", "final_url": "", "status": 200, "error": null, "products": 1, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Casacas 3 en 1"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Casacas 3 en 1"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Casacas 3 en 1"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Casacas 3 en 1"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Casacas 3 en 1"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/hombre/pantalones-shorts/interiores-termicos", "final_url": "", "status": 200, "error": null, "products": 1, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Interiores Térmicos"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/hombre/pantalones-shorts/trajes-de-ba-o", "final_url": "", "status": 200, "error": null, "products": 2, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Trajes de Baño"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Trajes de Baño"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Trajes de Baño"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Trajes de Baño"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Trajes de Baño"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/hombre/polos-y-polerones/interiores-termicos", "final_url": "", "status": 200, "error": null, "products": 1, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Interiores Térmicos"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/mujer/calzado/pantuflas", "final_url": "", "status": 200, "error": null, "products": 2, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Pantuflas"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Pantuflas"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Pantuflas"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Pantuflas"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Pantuflas"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/mujer/pantalones-shorts/interiores-termicos", "final_url": "", "status": 200, "error": null, "products": 1, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Interiores Térmicos"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Interiores Térmicos"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/mujer/pantalones-shorts/shorts", "final_url": "", "status": 200, "error": null, "products": 3, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Shorts"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Shorts"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Shorts"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Shorts"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Shorts"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/mujer/polos-y-polerones/blusas", "final_url": "", "status": 200, "error": null, "products": 2, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Blusas"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Blusas"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Blusas"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Blusas"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Blusas"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/ni-os/calzado", "final_url": "", "status": 200, "error": null, "products": 3, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Calzado"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Calzado"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Calzado"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Calzado"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Calzado"}]}, {"severity": "aviso", "issue": "pocos_productos", "issue_label": "Listado con pocos productos", "todo": "Se ve pobre para un evento. Suma productos o redirige el link.", "url": "https://www.thenorthface.com.pe/ni-os/pantalones-shorts", "final_url": "", "status": 200, "error": null, "products": 1, "page_type": "listado", "depth": 1, "times_linked": 138, "where": "Menú", "sources": [{"page": "https://www.thenorthface.com.pe/", "zone": "Menú", "text": "Pantalones & Shorts"}, {"page": "https://www.thenorthface.com.pe/cyber", "zone": "Menú", "text": "Pantalones & Shorts"}, {"page": "https://www.thenorthface.com.pe/tracking-pedidos/", "zone": "Menú", "text": "Pantalones & Shorts"}, {"page": "https://www.thenorthface.com.pe/tiendas/", "zone": "Menú", "text": "Pantalones & Shorts"}, {"page": "https://www.thenorthface.com.pe/ayuda/", "zone": "Menú", "text": "Pantalones & Shorts"}]}]}]};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} },
+};
+
+let current = 0;
+const fromHash = decodeURIComponent(location.hash.slice(1));
+const idx = DATA.reports.findIndex((r) => r.site.id === fromHash);
+if (idx >= 0) current = idx;
+
+function shortPath(url, withHost) {
+  try { const u = new URL(url); return (withHost ? u.host : "") + ((u.pathname + u.search) || "/"); } catch (e) { return url; }
+}
+function doneKey(site, url) { return "linkaudit:" + site + ":" + url; }
+
+function fact(it) {
+  if (it.issue === "sin_productos" || it.issue === "pocos_productos") {
+    return `<strong>${it.products}</strong> ${it.products === 1 ? "producto" : "productos"}`;
+  }
+  if (it.issue === "redirige_home" || it.issue === "redirect") {
+    return `va a <a href="${esc(it.final_url)}" target="_blank" rel="noopener">${esc(shortPath(it.final_url))}</a>`;
+  }
+  if (it.issue === "pdp_agotado") return "<strong>sin stock</strong>";
+  if (it.status) return `HTTP <strong>${it.status}</strong>`;
+  if (it.error) return esc(it.error);
+  return "";
+}
+
+function renderSites() {
+  const nav = $("sites");
+  if (DATA.reports.length < 2) { nav.hidden = true; return; }
+  nav.innerHTML = DATA.reports.map((r, i) => {
+    const n = r.stats.critical;
+    return `<button type="button" data-i="${i}" aria-pressed="${i === current}">${esc(r.site.name)}<span class="n ${n ? "has" : ""}">${n}</span></button>`;
+  }).join("");
+  nav.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    current = Number(b.dataset.i);
+    history.replaceState(null, "", "#" + DATA.reports[current].site.id);
+    render();
+  }));
+}
+
+function render() {
+  renderSites();
+  const r = DATA.reports[current];
+  if (!r) { $("headline").textContent = "Todavía no hay barridos."; return; }
+  const s = r.stats;
+  const total = s.critical + s.warnings;
+  const h = $("headline");
+  h.className = s.critical ? "" : "clean";
+  if (!total) h.textContent = "Todo en orden: ningún link roto ni listado vacío.";
+  else if (s.critical) h.textContent = `${s.critical} ${s.critical === 1 ? "link para corregir" : "links para corregir"} antes del evento`;
+  else h.textContent = "Sin links rotos. Quedan avisos por revisar.";
+
+  const when = new Date(r.generated_at).toLocaleString("es-CL", { timeZone: "America/Santiago", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  $("meta").innerHTML = `<a href="${esc(r.site.url)}" target="_blank" rel="noopener">${esc(r.site.name)}</a>: ${s.checked} URLs revisadas `
+    + `(${s.internal} del sitio y ${s.external} externas) y ${s.warnings} ${s.warnings === 1 ? "aviso" : "avisos"}. Barrido del ${esc(when)} h.`
+    + (s.truncated ? " El barrido llegó al tope de páginas y quedó incompleto." : "");
+  $("l-crit").textContent = `Críticos ${s.critical}`;
+  $("l-warn").textContent = `Avisos ${s.warnings}`;
+  renderList();
+}
+
+function renderList() {
+  const r = DATA.reports[current];
+  const showCrit = $("f-crit").checked, showWarn = $("f-warn").checked, hideDone = $("f-done").checked;
+  const q = $("q").value.trim().toLowerCase();
+  const groups = {};
+  for (const it of r.issues) {
+    if (it.severity === "critico" && !showCrit) continue;
+    if (it.severity === "aviso" && !showWarn) continue;
+    const done = store.get(doneKey(r.site.id, it.url)) === "1";
+    if (hideDone && done) continue;
+    if (q) {
+      const hay = (it.url + " " + it.sources.map((x) => x.text + " " + x.page).join(" ")).toLowerCase();
+      if (!hay.includes(q)) continue;
+    }
+    (groups[it.issue] ||= []).push({ it, done });
+  }
+  const order = Object.keys(DATA.issues);
+  const keys = order.filter((k) => groups[k]);
+  if (!keys.length) {
+    $("list").innerHTML = `<p class="empty-state">${r.issues.length ? "Nada coincide con los filtros. Ajusta la búsqueda o vuelve a mostrar los corregidos." : "No hay nada que corregir en este sitio."}</p>`;
+    return;
+  }
+  $("list").innerHTML = keys.map((k) => {
+    const meta = DATA.issues[k];
+    const rows = groups[k].map(({ it, done }) => {
+      const first = it.sources[0];
+      const text = first && first.text ? ` con el texto <q>${esc(first.text)}</q>` : "";
+      const where = it.where ? `En ${esc(it.where)}${text}.` : "Link sin origen registrado.";
+      const linked = it.times_linked > 1 ? ` Linkeada en ${it.times_linked} páginas.` : "";
+      const more = it.sources.length ? `<details><summary>Ver dónde está el link</summary><ul>${it.sources.map((x) =>
+        `<li>${esc(x.zone)}: <a href="${esc(x.page)}" target="_blank" rel="noopener">${esc(shortPath(x.page))}</a>${x.text ? ` (<q>${esc(x.text)}</q>)` : ""}</li>`).join("")}</ul></details>` : "";
+      return `<li class="row ${done ? "done" : ""}">
+        <input type="checkbox" ${done ? "checked" : ""} data-url="${esc(it.url)}" aria-label="Marcar como corregido">
+        <div><a class="path" href="${esc(it.url)}" target="_blank" rel="noopener">${esc(shortPath(it.url, it.page_type === "externo"))}</a>
+          <div class="where">${where}${linked}</div></div>
+        <div class="fact">${fact(it)}</div>${more}</li>`;
+    }).join("");
+    return `<section class="group ${meta.severity}"><h2>${esc(meta.label)} <span class="count">${groups[k].length}</span></h2>
+      <p class="todo">${esc(meta.todo)}</p><ul class="rows">${rows}</ul></section>`;
+  }).join("");
+  $("list").querySelectorAll("input[type=checkbox]").forEach((cb) => cb.addEventListener("change", () => {
+    store.set(doneKey(r.site.id, cb.dataset.url), cb.checked ? "1" : null);
+    cb.closest("li").classList.toggle("done", cb.checked);
+    if ($("f-done").checked && cb.checked) renderList();
+  }));
+}
+
+["f-crit", "f-warn", "f-done"].forEach((id) => $(id).addEventListener("change", renderList));
+$("q").addEventListener("input", renderList);
+render();
+</script>
+</body>
+</html>
