@@ -4,105 +4,17 @@
   "name": "The North Face Perú",
   "url": "https://www.thenorthface.com.pe/"
  },
- "generated_at": "2026-11-02T12:51:24+00:00",
+ "generated_at": "2026-11-02T12:59:51+00:00",
  "stats": {
-  "checked": 78,
-  "internal": 59,
-  "external": 19,
-  "critical": 3,
+  "checked": 1,
+  "internal": 1,
+  "external": 0,
+  "critical": 0,
   "warnings": 0,
-  "by_issue": {
-   "404": 3
-  },
-  "duration_s": 27.7,
+  "hidden": 0,
+  "by_issue": {},
+  "duration_s": 0.2,
   "truncated": false
  },
- "issues": [
-  {
-   "severity": "critico",
-   "issue": "404",
-   "issue_label": "Página no existe (404)",
-   "todo": "Cambia el link a una URL vigente o quítalo.",
-   "url": "https://www.thenorthface.com.pe/nosotros/",
-   "final_url": "",
-   "status": 404,
-   "error": null,
-   "products": null,
-   "page_type": "404",
-   "depth": 1,
-   "times_linked": 56,
-   "where": "Menú",
-   "sources": [
-    {
-     "page": "https://www.thenorthface.com.pe/",
-     "zone": "Menú",
-     "text": "Nosotros"
-    },
-    {
-     "page": "https://www.thenorthface.com.pe/cyber",
-     "zone": "Menú",
-     "text": "Nosotros"
-    },
-    {
-     "page": "https://www.thenorthface.com.pe/tracking-pedidos/",
-     "zone": "Menú",
-     "text": "Nosotros"
-    },
-    {
-     "page": "https://www.thenorthface.com.pe/tiendas/",
-     "zone": "Menú",
-     "text": "Nosotros"
-    },
-    {
-     "page": "https://www.thenorthface.com.pe/ayuda/",
-     "zone": "Menú",
-     "text": "Nosotros"
-    }
-   ]
-  },
-  {
-   "severity": "critico",
-   "issue": "404",
-   "issue_label": "Página no existe (404)",
-   "todo": "Cambia el link a una URL vigente o quítalo.",
-   "url": "https://www.thenorthface.com.pe/tecnologia",
-   "final_url": "",
-   "status": 404,
-   "error": null,
-   "products": null,
-   "page_type": "404",
-   "depth": 2,
-   "times_linked": 1,
-   "where": "Contenido de /cyber",
-   "sources": [
-    {
-     "page": "https://www.thenorthface.com.pe/cyber",
-     "zone": "Contenido",
-     "text": "Tecnologías TNF"
-    }
-   ]
-  },
-  {
-   "severity": "critico",
-   "issue": "404",
-   "issue_label": "Página no existe (404)",
-   "todo": "Cambia el link a una URL vigente o quítalo.",
-   "url": "https://www.thenorthface.com.pe/zapatos",
-   "final_url": "",
-   "status": 404,
-   "error": null,
-   "products": null,
-   "page_type": "404",
-   "depth": 2,
-   "times_linked": 1,
-   "where": "Contenido de /cyber",
-   "sources": [
-    {
-     "page": "https://www.thenorthface.com.pe/cyber",
-     "zone": "Contenido",
-     "text": "Calzado"
-    }
-   ]
-  }
- ]
+ "issues": []
 }

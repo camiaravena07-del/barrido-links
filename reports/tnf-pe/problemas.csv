@@ -1,4 +1,1 @@
-﻿Severidad;Problema;URL linkeada;Dónde aparece;Texto o imagen del link;Página donde está el link;Páginas que la linkean;Productos;Status HTTP;URL final (si redirige);Qué hacer
-critico;Página no existe (404);https://www.thenorthface.com.pe/nosotros/;Menú;Nosotros;https://www.thenorthface.com.pe/;56;;404;;Cambia el link a una URL vigente o quítalo.
-critico;Página no existe (404);https://www.thenorthface.com.pe/tecnologia;Contenido de /cyber;Tecnologías TNF;https://www.thenorthface.com.pe/cyber;1;;404;;Cambia el link a una URL vigente o quítalo.
-critico;Página no existe (404);https://www.thenorthface.com.pe/zapatos;Contenido de /cyber;Calzado;https://www.thenorthface.com.pe/cyber;1;;404;;Cambia el link a una URL vigente o quítalo.
+﻿Severidad;Problema;URL linkeada;Dónde aparece;Se ve en;Texto o imagen del link;Página donde está el link;Páginas que la linkean;Productos;Status HTTP;URL final (si redirige);Qué hacer
