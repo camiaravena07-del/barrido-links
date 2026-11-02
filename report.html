@@ -94,6 +94,12 @@
   }
   .sev .c { background: var(--crit-bg); color: var(--crit); }
   .sev .w { background: var(--warn-bg); color: var(--warn); }
+  .sev label[hidden] { display: none; }
+  .sev .h { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  li.row.hid .path { color: var(--muted); }
+  .vis { display: inline-block; font-size: 13px; font-weight: 700; padding: 1px 7px; border-radius: 4px; margin-right: 6px; border: 1px solid var(--line); color: var(--ink); white-space: nowrap; }
+  .vis.only { border-color: var(--warn); color: var(--warn); }
+  .vis.off { color: var(--muted); border-style: dashed; }
   .sev input { accent-color: currentColor; margin: 0; }
   .search { flex: 1 1 220px; }
   .search input {
@@ -147,6 +153,7 @@
     <div class="sev">
       <label class="c"><input type="checkbox" id="f-crit" checked> <span id="l-crit">Críticos</span></label>
       <label class="w"><input type="checkbox" id="f-warn" checked> <span id="l-warn">Avisos</span></label>
+      <label class="h"><input type="checkbox" id="f-hid"> <span id="l-hid">Ocultos</span></label>
     </div>
     <div class="search"><input type="search" id="q" placeholder="Buscar por URL o texto del link" aria-label="Buscar por URL o texto del link"></div>
     <label class="hide-done"><input type="checkbox" id="f-done"> Ocultar corregidos</label>
@@ -176,6 +183,17 @@ if (idx >= 0) current = idx;
 
 function shortPath(url, withHost) {
   try { const u = new URL(url); return (withHost ? u.host : "") + ((u.pathname + u.search) || "/"); } catch (e) { return url; }
+}
+function visBadge(v) {
+  if (!v || v === "sin verificar") return "";
+  const map = { "desktop y mobile": ["Desktop y mobile", ""], "solo desktop": ["Solo desktop", "only"], "solo mobile": ["Solo mobile", "only"], "oculto": ["Oculto", "off"] };
+  const [label, cls] = map[v] || [v, ""];
+  return `<span class="vis ${cls}">${label}</span>`;
+}
+function srcVis(x) {
+  if (x.desktop === undefined && x.mobile === undefined) return "";
+  const on = [x.desktop ? "desktop" : null, x.mobile ? "mobile" : null].filter(Boolean);
+  return on.length ? `, se ve en ${on.join(" y ")}` : ", oculto en esta página";
 }
 function doneKey(site, url) { return "linkaudit:" + site + ":" + url; }
 
@@ -221,20 +239,24 @@ function render() {
   const when = new Date(r.generated_at).toLocaleString("es-CL", { timeZone: "America/Santiago", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
   $("meta").innerHTML = `<a href="${esc(r.site.url)}" target="_blank" rel="noopener">${esc(r.site.name)}</a>: ${s.checked} URLs revisadas `
     + `(${s.internal} del sitio y ${s.external} externas) y ${s.warnings} ${s.warnings === 1 ? "aviso" : "avisos"}. Barrido del ${esc(when)} h.`
+    + (s.hidden ? ` ${s.hidden} ${s.hidden === 1 ? "link con problema está" : "links con problema están"} en bloques ocultos que el cliente no ve.` : "")
     + (s.truncated ? " El barrido llegó al tope de páginas y quedó incompleto." : "");
   $("l-crit").textContent = `Críticos ${s.critical}`;
   $("l-warn").textContent = `Avisos ${s.warnings}`;
+  $("l-hid").textContent = `Ocultos ${s.hidden || 0}`;
+  $("l-hid").parentElement.hidden = !s.hidden;
   renderList();
 }
 
 function renderList() {
   const r = DATA.reports[current];
-  const showCrit = $("f-crit").checked, showWarn = $("f-warn").checked, hideDone = $("f-done").checked;
+  const showCrit = $("f-crit").checked, showWarn = $("f-warn").checked, showHid = $("f-hid").checked, hideDone = $("f-done").checked;
   const q = $("q").value.trim().toLowerCase();
   const groups = {};
   for (const it of r.issues) {
     if (it.severity === "critico" && !showCrit) continue;
     if (it.severity === "aviso" && !showWarn) continue;
+    if (it.severity === "oculto" && !showHid) continue;
     const done = store.get(doneKey(r.site.id, it.url)) === "1";
     if (hideDone && done) continue;
     if (q) {
@@ -257,11 +279,12 @@ function renderList() {
       const where = it.where ? `En ${esc(it.where)}${text}.` : "Link sin origen registrado.";
       const linked = it.times_linked > 1 ? ` Linkeada en ${it.times_linked} páginas.` : "";
       const more = it.sources.length ? `<details><summary>Ver dónde está el link</summary><ul>${it.sources.map((x) =>
-        `<li>${esc(x.zone)}: <a href="${esc(x.page)}" target="_blank" rel="noopener">${esc(shortPath(x.page))}</a>${x.text ? ` (<q>${esc(x.text)}</q>)` : ""}</li>`).join("")}</ul></details>` : "";
-      return `<li class="row ${done ? "done" : ""}">
+        `<li>${esc(x.zone)}: <a href="${esc(x.page)}" target="_blank" rel="noopener">${esc(shortPath(x.page))}</a>${x.text ? ` (<q>${esc(x.text)}</q>)` : ""}${srcVis(x)}</li>`).join("")}</ul></details>` : "";
+      const visTag = visBadge(it.visible);
+      return `<li class="row ${done ? "done" : ""} ${it.severity === "oculto" ? "hid" : ""}">
         <input type="checkbox" ${done ? "checked" : ""} data-url="${esc(it.url)}" aria-label="Marcar como corregido">
         <div><a class="path" href="${esc(it.url)}" target="_blank" rel="noopener">${esc(shortPath(it.url, it.page_type === "externo"))}</a>
-          <div class="where">${where}${linked}</div></div>
+          <div class="where">${visTag}${where}${linked}</div></div>
         <div class="fact">${fact(it)}</div>${more}</li>`;
     }).join("");
     return `<section class="group ${meta.severity}"><h2>${esc(meta.label)} <span class="count">${groups[k].length}</span></h2>
@@ -274,7 +297,7 @@ function renderList() {
   }));
 }
 
-["f-crit", "f-warn", "f-done"].forEach((id) => $(id).addEventListener("change", renderList));
+["f-crit", "f-warn", "f-hid", "f-done"].forEach((id) => $(id).addEventListener("change", renderList));
 $("q").addEventListener("input", renderList);
 render();
 </script>

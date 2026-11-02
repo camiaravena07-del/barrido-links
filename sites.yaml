@@ -9,7 +9,8 @@ defaults:
   low_product_threshold: 4  # listados con menos de esto (y más de 0) se marcan como "pocos productos"
   check_external: true      # revisar links a otros dominios (solo se marcan 404 o dominios caídos)
   check_pdp_stock: true     # marcar productos agotados cuando un banner o link apunta a ellos
-  skip_hidden: true         # no revisar links dentro de bloques ocultos (desactivados en el CMS)
+  check_visibility: true    # abrir las páginas en desktop y mobile para ver dónde se ve cada link
+  visibility_max_pages: 60  # tope de páginas a abrir con navegador por sitio
   user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 KomaxLinkAudit/1.0"
 
   # Textos que Magento muestra cuando un listado o búsqueda viene vacío

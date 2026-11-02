@@ -135,56 +135,6 @@ def zone_of(a) -> str:
     return "Contenido"
 
 
-HIDDEN_CLASSES = {"no-display", "hidden", "d-none", "hide", "pagebuilder-hidden"}
-INLINE_HIDDEN = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
-
-
-def _strip_media_blocks(css: str) -> str:
-    """Quita los bloques @media (reglas solo para algunos tamaños de pantalla)."""
-    out, i = [], 0
-    while True:
-        j = css.find("@media", i)
-        if j < 0:
-            out.append(css[i:])
-            return "".join(out)
-        out.append(css[i:j])
-        k = css.find("{", j)
-        if k < 0:
-            return "".join(out)
-        depth, m = 1, k + 1
-        while m < len(css) and depth:
-            depth += {"{": 1, "}": -1}.get(css[m], 0)
-            m += 1
-        i = m
-
-
-def hidden_pb_styles(soup: BeautifulSoup) -> set[str]:
-    """IDs de Page Builder (data-pb-style) que el sitio oculta con display:none en todas las pantallas."""
-    ids = set()
-    for style in soup.find_all("style"):
-        css = _strip_media_blocks(style.get_text() or "")
-        for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
-            if INLINE_HIDDEN.search(body):
-                ids.update(re.findall(r"data-pb-style\s*=\s*[\"']?([\w-]+)", sel))
-    return ids
-
-
-def is_hidden(a, pb_hidden: set[str]) -> bool:
-    """True si el link está dentro de un bloque que el cliente no ve (desactivado u oculto)."""
-    for el in [a, *a.parents]:
-        if el.name is None or el.name in ("html", "body"):
-            continue
-        if el.has_attr("hidden"):
-            return True
-        if INLINE_HIDDEN.search(el.get("style") or ""):
-            return True
-        if set(el.get("class") or []) & HIDDEN_CLASSES:
-            return True
-        if pb_hidden and el.get("data-pb-style") in pb_hidden:
-            return True
-    return False
-
-
 def anchor_text(a) -> str:
     text = a.get_text(" ", strip=True)
     if not text:
@@ -369,11 +319,8 @@ class Crawler:
         for selector in self.cfg.get("exclude_selectors", []):
             for el in soup.select(selector):
                 el.decompose()
-        pb_hidden = hidden_pb_styles(soup)
         found = []
         for a in soup.find_all("a", href=True):
-            if self.cfg.get("skip_hidden", True) and is_hidden(a, pb_hidden):
-                continue  # bloque oculto: el cliente no puede clickearlo
             url = normalize(a["href"], page_url, self.cfg)
             if not url:
                 continue
@@ -437,6 +384,99 @@ class Crawler:
             srcs.append({"page": page, "zone": zone, "text": text})
 
 
+# ---------------------------------------------------------------- desktop / mobile
+
+VIS_JS = r"""
+(isMobile) => {
+  const MENU = '.navigation, .nav-sections, .megamenu, .ms-megamenu, nav';
+  const hidden = (el) => { const cs = getComputedStyle(el); return cs.display === 'none' || cs.visibility === 'hidden'; };
+  function reachable(a) {
+    const menu = a.closest(MENU);
+    for (let el = a; el && el !== document.documentElement; el = el.parentElement) {
+      if (!hidden(el)) continue;
+      // Submenús desplegables: se abren con hover (desktop) o tap (mobile)
+      if (menu && el !== menu && menu.contains(el) && el.parentElement && el.parentElement.closest('li')) continue;
+      // En mobile el menú completo se abre con el botón hamburguesa
+      if (isMobile && el.matches(MENU) && el.contains(a)) continue;
+      // Pestañas (tabs): el cliente puede abrirlas
+      if (el.getAttribute('role') === 'tabpanel') continue;
+      return false;
+    }
+    return true;
+  }
+  return Array.from(document.querySelectorAll('a[href]')).map((a) => ({ href: a.href, v: reachable(a) }));
+}
+"""
+
+
+def check_visibility(rows: list[dict], cfg: dict) -> None:
+    """Abre las páginas donde están los links con problema, en desktop y en mobile, y anota dónde se ven."""
+    for r in rows:
+        r["visible"] = "sin verificar"
+    if not rows or not cfg.get("check_visibility", True):
+        return
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("  Playwright no está instalado: no se revisa desktop/mobile")
+        return
+
+    pages: list[str] = []
+    for r in rows:
+        for src in r["sources"]:
+            if src["page"] not in pages:
+                pages.append(src["page"])
+    pages = pages[: int(cfg.get("visibility_max_pages", 60))]
+    print(f"  revisando desktop y mobile en {len(pages)} páginas", flush=True)
+
+    seen: dict[tuple[str, str], dict[str, bool]] = {}
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        contexts = {
+            "desktop": browser.new_context(viewport={"width": 1366, "height": 900},
+                                           user_agent=cfg.get("user_agent"), locale="es-CL"),
+            "mobile": browser.new_context(**pw.devices["iPhone 13"], locale="es-CL"),
+        }
+        for name, ctx in contexts.items():
+            ctx.route("**/*", lambda route: route.abort()
+                      if route.request.resource_type in ("image", "media", "font") else route.continue_())
+            page = ctx.new_page()
+            for url in pages:
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                    page.wait_for_timeout(int(cfg.get("visibility_wait_ms", 2500)))
+                    items = page.evaluate(VIS_JS, name == "mobile")
+                except Exception as exc:  # una página que falla no detiene el resto
+                    print(f"    no se pudo abrir {url} en {name}: {type(exc).__name__}")
+                    continue
+                found: dict[str, bool] = {}
+                for it in items:
+                    link = normalize(it["href"], url, cfg)
+                    if link:
+                        found[link] = found.get(link, False) or bool(it["v"])
+                seen[(url, name)] = found
+        browser.close()
+
+    for r in rows:
+        desk = mob = checked = False
+        for src in r["sources"]:
+            for name in ("desktop", "mobile"):
+                found = seen.get((src["page"], name))
+                if found is None or r["url"] not in found:
+                    continue
+                checked = True
+                src[name] = found[r["url"]]
+                if found[r["url"]]:
+                    desk = desk or name == "desktop"
+                    mob = mob or name == "mobile"
+        if not checked:
+            continue
+        r["visible"] = ("desktop y mobile" if desk and mob else "solo desktop" if desk
+                        else "solo mobile" if mob else "oculto")
+        if r["visible"] == "oculto":
+            r["severity"] = "oculto"  # el cliente no puede clickearlo
+
+
 # ---------------------------------------------------------------- reportes
 
 def where_summary(sources: list[dict]) -> str:
@@ -489,8 +529,13 @@ def write_csv(path: Path, rows: list[dict], fields: list[tuple[str, str]]) -> No
             writer.writerow(["" if row.get(key) is None else row.get(key) for key, _ in fields])
 
 
+SEVERITY_ORDER = {"critico": 0, "aviso": 1, "oculto": 2}
+
+
 def save_site_report(site: dict, crawler: Crawler, meta: dict) -> dict:
     rows = build_issue_rows(crawler)
+    check_visibility(rows, crawler.cfg)
+    rows.sort(key=lambda r: (SEVERITY_ORDER[r["severity"]], ISSUE_ORDER.index(r["issue"]), -r["times_linked"], r["url"]))
     now = dt.datetime.now(dt.timezone.utc)
     by_issue = defaultdict(int)
     for r in rows:
@@ -505,6 +550,7 @@ def save_site_report(site: dict, crawler: Crawler, meta: dict) -> dict:
             "external": len(crawler.records) - internal,
             "critical": sum(1 for r in rows if r["severity"] == "critico"),
             "warnings": sum(1 for r in rows if r["severity"] == "aviso"),
+            "hidden": sum(1 for r in rows if r["severity"] == "oculto"),
             "by_issue": dict(by_issue),
             **meta,
         },
@@ -516,7 +562,7 @@ def save_site_report(site: dict, crawler: Crawler, meta: dict) -> dict:
              "first_text": r["sources"][0]["text"] if r["sources"] else ""} for r in rows]
     write_csv(site_dir / "problemas.csv", flat, [
         ("severity", "Severidad"), ("issue_label", "Problema"), ("url", "URL linkeada"),
-        ("where", "Dónde aparece"), ("first_text", "Texto o imagen del link"),
+        ("where", "Dónde aparece"), ("visible", "Se ve en"), ("first_text", "Texto o imagen del link"),
         ("first_source", "Página donde está el link"), ("times_linked", "Páginas que la linkean"),
         ("products", "Productos"), ("status", "Status HTTP"), ("final_url", "URL final (si redirige)"),
         ("todo", "Qué hacer"),
@@ -556,18 +602,21 @@ def write_step_summary(report: dict) -> None:
         f"## {report['site']['name']}",
         f"{s['checked']} URLs revisadas en {s['duration_s']} s: "
         f"**{s['critical']} críticos** y {s['warnings']} avisos.",
-        "",
     ]
-    rows = report["issues"][:60]
+    if s.get("hidden"):
+        lines.append(f"Además hay {s['hidden']} links con problema en bloques ocultos (no se ven ni en desktop ni en mobile).")
+    lines.append("")
+    rows = [r for r in report["issues"] if r["severity"] != "oculto"][:60]
     if rows:
-        lines += ["| Severidad | Problema | URL | Dónde aparece | Texto del link |", "|---|---|---|---|---|"]
+        lines += ["| Severidad | Problema | URL | Dónde aparece | Se ve en | Texto del link |", "|---|---|---|---|---|---|"]
         for r in rows:
             text = (r["sources"][0]["text"] if r["sources"] else "").replace("|", "/")
-            lines.append(f"| {r['severity']} | {r['issue_label']} | {r['url']} | {r['where']} | {text} |")
-        if len(report["issues"]) > 60:
-            lines.append(f"\n…y {len(report['issues']) - 60} más. Revisa `reports/{report['site']['id']}/problemas.csv`.")
+            lines.append(f"| {r['severity']} | {r['issue_label']} | {r['url']} | {r['where']} | {r['visible']} | {text} |")
+        visible_total = sum(1 for r in report["issues"] if r["severity"] != "oculto")
+        if visible_total > 60:
+            lines.append(f"\n…y {visible_total - 60} más. Revisa `reports/{report['site']['id']}/problemas.csv`.")
     else:
-        lines.append("Sin problemas encontrados.")
+        lines.append("Sin problemas visibles para el cliente.")
     with open(target, "a", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n\n")
 
