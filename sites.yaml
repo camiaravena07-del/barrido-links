@@ -1,0 +1,77 @@
+# Configuración del barrido de links.
+# Para sumar un sitio, copia el bloque de tnf-pe dentro de "sites" y cambia id, name y url.
+
+defaults:
+  max_depth: 3              # 1 = solo links del home; 2 = + links dentro de categorías/landings; 3 = un nivel más
+  max_pages: 2500           # tope de URLs revisadas por sitio
+  workers: 6                # requests en paralelo (no subir mucho para no cargar el sitio)
+  timeout: 25               # segundos por request
+  low_product_threshold: 4  # listados con menos de esto (y más de 0) se marcan como "pocos productos"
+  check_external: true      # revisar links a otros dominios (solo se marcan 404 o dominios caídos)
+  check_pdp_stock: true     # marcar productos agotados cuando un banner o link apunta a ellos
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 KomaxLinkAudit/1.0"
+
+  # Textos que Magento muestra cuando un listado o búsqueda viene vacío
+  empty_text_patterns:
+    - "No podemos encontrar productos"
+    - "no arrojó resultados"
+    - "no devolvió resultados"
+    - "We can't find products"
+    - "Your search returned no results"
+
+  # Rutas que no tiene sentido revisar (requieren sesión o son acciones)
+  ignore_path_prefixes:
+    - /customer/
+    - /checkout/
+    - /sales/
+    - /wishlist/
+    - /catalog/product_compare/
+    - /newsletter/manage
+    - /review/
+    - /sendfriend/
+    - /persistent/
+
+  # Parámetros que se eliminan antes de comparar URLs (orden, paginación, tracking)
+  ignore_params:
+    - p
+    - product_list_order
+    - product_list_dir
+    - product_list_limit
+    - product_list_mode
+    - utm_source
+    - utm_medium
+    - utm_campaign
+    - utm_content
+    - utm_term
+    - gclid
+    - fbclid
+
+  # Zonas de la página cuyos links NO se revisan porque los genera Magento solo
+  # (filtros, paginación, grilla de productos, breadcrumbs, minicart)
+  exclude_selectors:
+    - "#layered-filter-block"
+    - ".block.filter"
+    - ".filter-options"
+    - ".toolbar"
+    - ".pages"
+    - ".products.wrapper"
+    - ".product-items"
+    - ".breadcrumbs"
+    - ".minicart-wrapper"
+    - ".block-compare"
+    - ".block-wishlist"
+    - ".authorization-link"
+
+sites:
+  - id: tnf-pe
+    name: The North Face Perú
+    url: https://www.thenorthface.com.pe/
+    # Otros dominios que cuentan como el mismo sitio (ej. versión sin www)
+    hosts:
+      - thenorthface.com.pe
+
+  # - id: tnf-cl
+  #   name: The North Face Chile
+  #   url: https://www.thenorthface.cl/
+  #   hosts:
+  #     - thenorthface.cl
