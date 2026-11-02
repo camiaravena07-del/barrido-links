@@ -38,7 +38,7 @@ from urllib3.util.retry import Retry
 ROOT = Path(__file__).resolve().parent
 REPORTS_DIR = ROOT / "reports"
 DOCS_DIR = ROOT / "docs"
-TEMPLATE = ROOT / "templates" / "report.html"
+TEMPLATE = ROOT / "report.html"
 
 # código: (severidad, nombre, qué hacer)
 ISSUES = {
